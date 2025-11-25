@@ -1,22 +1,32 @@
 import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:tflite/tflite.dart';
+import 'package:flutter/services.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:image/image.dart' as img;
 
 class JerseyClassifierService {
   JerseyClassifierService._();
 
   static final JerseyClassifierService instance = JerseyClassifierService._();
 
+  Interpreter? _interpreter;
+  List<String> _labels = [];
   bool _modelLoaded = false;
 
   Future<void> _ensureModelLoaded() async {
     if (_modelLoaded) return;
 
-    await Tflite.close();
-    await Tflite.loadModel(
-      model: 'assets/model_unquant.tflite',
-      labels: 'assets/labels.txt',
-    );
+    // Load the model
+    _interpreter = await Interpreter.fromAsset('model_unquant.tflite');
+
+    // Load labels
+    final labelsData = await rootBundle.loadString('assets/labels.txt');
+    _labels = labelsData
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     _modelLoaded = true;
   }
@@ -24,48 +34,77 @@ class JerseyClassifierService {
   Future<ClassificationResult?> classifyImage(File imageFile) async {
     await _ensureModelLoaded();
 
-    final recognitions = await Tflite.runModelOnImage(
-      path: imageFile.path,
-      numResults: 10,
-      threshold: 0.0,
-      asynch: true,
+    if (_interpreter == null) return null;
+
+    // Read and decode image
+    final imageBytes = await imageFile.readAsBytes();
+    final image = img.decodeImage(imageBytes);
+    if (image == null) return null;
+
+    // Get input shape from interpreter
+    final inputShape = _interpreter!.getInputTensor(0).shape;
+    final inputHeight = inputShape[1];
+    final inputWidth = inputShape[2];
+
+    // Resize image to model input size
+    final resizedImage = img.copyResize(
+      image,
+      width: inputWidth,
+      height: inputHeight,
     );
 
-    if (recognitions == null || recognitions.isEmpty) {
-      return null;
-    }
+    // Prepare input tensor (normalize to 0-1 range)
+    final input = List.generate(
+      1,
+      (_) => List.generate(
+        inputHeight,
+        (y) => List.generate(
+          inputWidth,
+          (x) {
+            final pixel = resizedImage.getPixel(x, y);
+            return [
+              pixel.r / 255.0,
+              pixel.g / 255.0,
+              pixel.b / 255.0,
+            ];
+          },
+        ),
+      ),
+    );
 
-    final results = (recognitions as List)
-        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+    // Prepare output tensor
+    final outputShape = _interpreter!.getOutputTensor(0).shape;
+    final numClasses = outputShape[1];
+    final output = List.generate(1, (_) => List.filled(numClasses, 0.0));
 
-    results.sort((a, b) {
-      final da = (a['confidence'] as double?) ?? 0.0;
-      final db = (b['confidence'] as double?) ?? 0.0;
-      return db.compareTo(da);
-    });
+    // Run inference
+    _interpreter!.run(input, output);
 
-    final top = results.first;
-    final scores = List<double>.filled(10, 0.0);
+    final scores = output[0];
 
-    for (final r in results) {
-      final index = (r['index'] as int?) ?? -1;
-      final conf = (r['confidence'] as double?) ?? 0.0;
-      if (index >= 0 && index < scores.length) {
-        scores[index] = conf;
+    // Find top result
+    int topIndex = 0;
+    double topConfidence = scores[0];
+    for (int i = 1; i < scores.length; i++) {
+      if (scores[i] > topConfidence) {
+        topConfidence = scores[i];
+        topIndex = i;
       }
     }
 
+    final topLabel = topIndex < _labels.length ? _labels[topIndex] : 'Unknown';
+
     return ClassificationResult(
-      topLabel: (top['label'] as String?) ?? 'Unknown',
-      topIndex: (top['index'] as int?) ?? 0,
-      topConfidence: (top['confidence'] as double?) ?? 0.0,
+      topLabel: topLabel,
+      topIndex: topIndex,
+      topConfidence: topConfidence,
       scores: scores,
     );
   }
 
   Future<void> dispose() async {
-    await Tflite.close();
+    _interpreter?.close();
+    _interpreter = null;
     _modelLoaded = false;
   }
 }

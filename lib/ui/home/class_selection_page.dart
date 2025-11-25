@@ -8,8 +8,7 @@ class ClassSelectionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Replace placeholder class names with actual model classes.
-    final classes = List<String>.generate(10, (i) => 'Class ${i + 1}');
+    final classes = AppColors.classNames;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -69,32 +68,44 @@ class ClassSelectionPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          height: 60,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                color.withOpacity(0.9),
-                                color.withOpacity(0.6),
-                              ],
+                        Expanded(
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  color.withOpacity(0.9),
+                                  color.withOpacity(0.6),
+                                ],
+                              ),
+                            ),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/images/$name.png',
+                                width: 44,
+                                height: 44,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           name,
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

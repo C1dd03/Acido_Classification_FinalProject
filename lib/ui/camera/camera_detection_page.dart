@@ -168,11 +168,21 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                               _isProcessing = false;
                             });
 
+                            // Get clean label name (remove index prefix if present)
+                            String cleanLabel = result.topLabel;
+                            if (cleanLabel.contains(' ')) {
+                              final parts = cleanLabel.split(' ');
+                              if (int.tryParse(parts[0]) != null) {
+                                cleanLabel = parts.sublist(1).join(' ');
+                              }
+                            }
+
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => DetectionResultPage(
-                                  detectedClassName: result.topLabel,
+                                  detectedClassName: cleanLabel,
                                   confidence: _confidence,
+                                  scores: result.scores,
                                 ),
                               ),
                             );

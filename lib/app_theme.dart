@@ -11,15 +11,28 @@ class AppColors {
   static const Color textSecondary = Color(0xFF6B6F80);
 
   static const List<Color> classColors = [
-    Color(0xFF4A90E2),
-    Color(0xFF6A5AE0),
-    Color(0xFF3EDBF0),
-    Color(0xFFFF7F50),
-    Color(0xFFFFC857),
-    Color(0xFF3AD29F),
-    Color(0xFFFF5A5F),
-    Color(0xFF9B59B6),
-    Color(0xFF16A085),
-    Color(0xFF2980B9),
+    Color(0xFF007A33), // Boston Celtics - Green
+    Color(0xFF000000), // Brooklyn Nets - Black
+    Color(0xFFCE1141), // Chicago Bulls - Red
+    Color(0xFF00538C), // Dallas Mavericks - Blue
+    Color(0xFFFEC524), // Denver Nuggets - Gold
+    Color(0xFF1D428A), // Golden State Warriors - Blue
+    Color(0xFF552583), // Los Angeles Lakers - Purple
+    Color(0xFF98002E), // Miami Heat - Red
+    Color(0xFF00471B), // Milwaukee Bucks - Green
+    Color(0xFF1D1160), // Phoenix Suns - Purple
+  ];
+
+  static const List<String> classNames = [
+    'Boston Celtics',
+    'Brooklyn Nets',
+    'Chicago Bulls',
+    'Dallas Mavericks',
+    'Denver Nuggets',
+    'Golden State Warriors',
+    'Los Angeles Lakers',
+    'Miami Heat',
+    'Milwaukee Bucks',
+    'Phoenix Suns',
   ];
 }

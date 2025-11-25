@@ -5,12 +5,14 @@ import '../../app_theme.dart';
 class DetectionResultPage extends StatelessWidget {
   const DetectionResultPage({
     super.key,
-    this.detectedClassName = 'Class 1',
+    this.detectedClassName = 'Boston Celtics',
     this.confidence = 0.0,
+    this.scores,
   });
 
   final String detectedClassName;
   final double confidence;
+  final List<double>? scores;
 
   @override
   Widget build(BuildContext context) {
@@ -90,21 +92,28 @@ class DetectionResultPage extends StatelessWidget {
             const SizedBox(height: 12),
             Expanded(
               child: ListView.builder(
-                itemCount: 10,
+                itemCount: AppColors.classNames.length,
                 itemBuilder: (context, index) {
-                  final color = AppColors.classColors[index % AppColors.classColors.length];
+                  final color = AppColors.classColors[index];
+                  final className = AppColors.classNames[index];
+                  final score = (scores != null && index < scores!.length)
+                      ? scores![index]
+                      : 0.0;
+                  final scorePercent = (score * 100).toStringAsFixed(1);
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
                         SizedBox(
-                          width: 80,
+                          width: 120,
                           child: Text(
-                            'Class ${index + 1}',
+                            className,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Expanded(
@@ -117,7 +126,7 @@ class DetectionResultPage extends StatelessWidget {
                             alignment: Alignment.centerLeft,
                             child: FractionallySizedBox(
                               alignment: Alignment.centerLeft,
-                              widthFactor: 0.4,
+                              widthFactor: score.clamp(0.0, 1.0),
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(999),
@@ -128,11 +137,15 @@ class DetectionResultPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          '—%',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
+                        SizedBox(
+                          width: 45,
+                          child: Text(
+                            '$scorePercent%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                            textAlign: TextAlign.right,
                           ),
                         ),
                       ],

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -13,12 +14,23 @@ class JerseyClassifierService {
   Interpreter? _interpreter;
   List<String> _labels = [];
   bool _modelLoaded = false;
+  int _inputHeight = 224;
+  int _inputWidth = 224;
 
-  Future<void> _ensureModelLoaded() async {
+  List<String> get labels => _labels;
+
+  Future<void> ensureModelLoaded() async {
     if (_modelLoaded) return;
 
-    // Load the model
-    _interpreter = await Interpreter.fromAsset('model_unquant.tflite');
+    // Load the model from assets using rootBundle
+    final modelData = await rootBundle.load('assets/model_unquant.tflite');
+    final buffer = modelData.buffer.asUint8List();
+    _interpreter = Interpreter.fromBuffer(buffer);
+
+    // Get input shape from interpreter
+    final inputShape = _interpreter!.getInputTensor(0).shape;
+    _inputHeight = inputShape[1];
+    _inputWidth = inputShape[2];
 
     // Load labels
     final labelsData = await rootBundle.loadString('assets/labels.txt');
@@ -32,7 +44,7 @@ class JerseyClassifierService {
   }
 
   Future<ClassificationResult?> classifyImage(File imageFile) async {
-    await _ensureModelLoaded();
+    await ensureModelLoaded();
 
     if (_interpreter == null) return null;
 
@@ -41,25 +53,108 @@ class JerseyClassifierService {
     final image = img.decodeImage(imageBytes);
     if (image == null) return null;
 
-    // Get input shape from interpreter
-    final inputShape = _interpreter!.getInputTensor(0).shape;
-    final inputHeight = inputShape[1];
-    final inputWidth = inputShape[2];
+    return _runInference(image);
+  }
 
+  /// Classify a CameraImage frame for real-time detection
+  ClassificationResult? classifyCameraImage(CameraImage cameraImage) {
+    if (_interpreter == null || !_modelLoaded) return null;
+
+    try {
+      // Convert CameraImage to img.Image
+      final image = _convertCameraImage(cameraImage);
+      if (image == null) return null;
+
+      return _runInference(image);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  img.Image? _convertCameraImage(CameraImage cameraImage) {
+    try {
+      // Handle YUV420 format (most common on Android)
+      if (cameraImage.format.group == ImageFormatGroup.yuv420) {
+        return _convertYUV420ToImage(cameraImage);
+      }
+      // Handle BGRA8888 format (iOS)
+      else if (cameraImage.format.group == ImageFormatGroup.bgra8888) {
+        return _convertBGRA8888ToImage(cameraImage);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  img.Image _convertYUV420ToImage(CameraImage cameraImage) {
+    final width = cameraImage.width;
+    final height = cameraImage.height;
+
+    final yPlane = cameraImage.planes[0];
+    final uPlane = cameraImage.planes[1];
+    final vPlane = cameraImage.planes[2];
+
+    final image = img.Image(width: width, height: height);
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final yIndex = y * yPlane.bytesPerRow + x;
+        final uvIndex = (y ~/ 2) * uPlane.bytesPerRow + (x ~/ 2);
+
+        final yValue = yPlane.bytes[yIndex];
+        final uValue = uPlane.bytes[uvIndex];
+        final vValue = vPlane.bytes[uvIndex];
+
+        // YUV to RGB conversion
+        int r = (yValue + 1.402 * (vValue - 128)).round().clamp(0, 255);
+        int g = (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
+            .round()
+            .clamp(0, 255);
+        int b = (yValue + 1.772 * (uValue - 128)).round().clamp(0, 255);
+
+        image.setPixelRgb(x, y, r, g, b);
+      }
+    }
+
+    return image;
+  }
+
+  img.Image _convertBGRA8888ToImage(CameraImage cameraImage) {
+    final plane = cameraImage.planes[0];
+    final width = cameraImage.width;
+    final height = cameraImage.height;
+
+    final image = img.Image(width: width, height: height);
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final index = y * plane.bytesPerRow + x * 4;
+        final b = plane.bytes[index];
+        final g = plane.bytes[index + 1];
+        final r = plane.bytes[index + 2];
+        image.setPixelRgb(x, y, r, g, b);
+      }
+    }
+
+    return image;
+  }
+
+  ClassificationResult? _runInference(img.Image image) {
     // Resize image to model input size
     final resizedImage = img.copyResize(
       image,
-      width: inputWidth,
-      height: inputHeight,
+      width: _inputWidth,
+      height: _inputHeight,
     );
 
     // Prepare input tensor (normalize to 0-1 range)
     final input = List.generate(
       1,
       (_) => List.generate(
-        inputHeight,
+        _inputHeight,
         (y) => List.generate(
-          inputWidth,
+          _inputWidth,
           (x) {
             final pixel = resizedImage.getPixel(x, y);
             return [
@@ -100,6 +195,17 @@ class JerseyClassifierService {
       topConfidence: topConfidence,
       scores: scores,
     );
+  }
+
+  /// Get clean label name (remove index prefix if present)
+  String cleanLabel(String label) {
+    if (label.contains(' ')) {
+      final parts = label.split(' ');
+      if (int.tryParse(parts[0]) != null) {
+        return parts.sublist(1).join(' ');
+      }
+    }
+    return label;
   }
 
   Future<void> dispose() async {

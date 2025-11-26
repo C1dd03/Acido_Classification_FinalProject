@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+
 import 'app_theme.dart';
+import 'core/services/detection_storage_service.dart';
 import 'ui/splash/splash_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Load saved detection records
+  await DetectionStorageService.instance.loadRecords();
+
   runApp(const MyApp());
 }
 

@@ -5,6 +5,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme.dart';
+import '../../core/models/detection_record.dart';
+import '../../core/services/detection_storage_service.dart';
 import '../../core/services/jersey_classifier_service.dart';
 import '../detection/detection_result_page.dart';
 
@@ -140,6 +142,23 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       }
 
       final cleanLabel = _classifier.cleanLabel(result.topLabel);
+
+      // Save detection record
+      final groundTruthClass = widget.selectedClassName ?? 'Unknown';
+      final groundTruthIndex = widget.selectedClassIndex ?? -1;
+
+      final record = DetectionRecord(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        timestamp: DateTime.now(),
+        groundTruthClass: groundTruthClass,
+        groundTruthIndex: groundTruthIndex,
+        predictedClass: cleanLabel,
+        predictedIndex: result.topIndex,
+        confidence: result.topConfidence,
+        scores: result.scores,
+      );
+
+      await DetectionStorageService.instance.saveRecord(record);
 
       // Navigate to result page
       Navigator.of(context).push(

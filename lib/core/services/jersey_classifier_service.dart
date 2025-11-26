@@ -95,23 +95,33 @@ class JerseyClassifierService {
     final uPlane = cameraImage.planes[1];
     final vPlane = cameraImage.planes[2];
 
+    final yBytes = yPlane.bytes;
+    final uBytes = uPlane.bytes;
+    final vBytes = vPlane.bytes;
+
+    final yRowStride = yPlane.bytesPerRow;
+    final yPixelStride = yPlane.bytesPerPixel ?? 1;
+
+    final uvRowStride = uPlane.bytesPerRow;
+    final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+
     final image = img.Image(width: width, height: height);
 
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
-        final yIndex = y * yPlane.bytesPerRow + x;
-        final uvIndex = (y ~/ 2) * uPlane.bytesPerRow + (x ~/ 2);
+        final int yIndex = y * yRowStride + x * yPixelStride;
+        final int uvIndex =
+            (y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride;
 
-        final yValue = yPlane.bytes[yIndex];
-        final uValue = uPlane.bytes[uvIndex];
-        final vValue = vPlane.bytes[uvIndex];
+        final double yValue = yBytes[yIndex].toDouble();
+        final double uValue = uBytes[uvIndex].toDouble() - 128.0;
+        final double vValue = vBytes[uvIndex].toDouble() - 128.0;
 
-        // YUV to RGB conversion
-        int r = (yValue + 1.402 * (vValue - 128)).round().clamp(0, 255);
-        int g = (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
+        int r = (yValue + 1.402 * vValue).round().clamp(0, 255);
+        int g = (yValue - 0.344136 * uValue - 0.714136 * vValue)
             .round()
             .clamp(0, 255);
-        int b = (yValue + 1.772 * (uValue - 128)).round().clamp(0, 255);
+        int b = (yValue + 1.772 * uValue).round().clamp(0, 255);
 
         image.setPixelRgb(x, y, r, g, b);
       }

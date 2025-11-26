@@ -30,13 +30,15 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
   bool _isCameraInitialized = false;
   String? _errorMessage;
 
-  // Real-time detection state
-  String _detectedClass = 'Scanning...';
+  // Detection overlay state (shows last captured result)
+  String _detectedClass = 'Ready to scan';
   double _confidence = 0;
   List<double> _scores = [];
   bool _isProcessingFrame = false;
   int _frameSkipCount = 0;
-  static const int _frameSkipInterval = 10; // Process every Nth frame
+  static const int _frameSkipInterval = 3; // Process every Nth frame
+  static const double _smoothingFactor = 0.3; // For exponential moving average
+  List<double>? _smoothedScores;
 
   // For snapshot capture
   bool _isCapturing = false;
@@ -67,7 +69,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
       _cameraController = CameraController(
         backCamera,
-        ResolutionPreset.medium,
+        ResolutionPreset.low,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
@@ -75,9 +77,6 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       await _cameraController!.initialize();
 
       if (!mounted) return;
-
-      // Start image stream for real-time detection
-      await _cameraController!.startImageStream(_processCameraFrame);
 
       setState(() => _isCameraInitialized = true);
     } catch (e) {
@@ -96,15 +95,43 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     if (_isProcessingFrame || _isCapturing) return;
     _isProcessingFrame = true;
 
-    // Run inference
+    // Run inference synchronously on this frame
     final result = _classifier.classifyCameraImage(cameraImage);
 
     if (result != null && mounted) {
-      final cleanLabel = _classifier.cleanLabel(result.topLabel);
+      final scores = result.scores;
+
+      // Initialize or update smoothed scores with exponential moving average
+      if (_smoothedScores == null || _smoothedScores!.length != scores.length) {
+        _smoothedScores = List<double>.from(scores);
+      } else {
+        for (int i = 0; i < scores.length; i++) {
+          _smoothedScores![i] = _smoothingFactor * scores[i] +
+              (1 - _smoothingFactor) * _smoothedScores![i];
+        }
+      }
+
+      final smoothed = _smoothedScores!;
+
+      // Find top index from smoothed scores
+      int topIndex = 0;
+      double topScore = smoothed[0];
+      for (int i = 1; i < smoothed.length; i++) {
+        if (smoothed[i] > topScore) {
+          topScore = smoothed[i];
+          topIndex = i;
+        }
+      }
+
+      final labels = _classifier.labels;
+      final displayLabel = topIndex < labels.length
+          ? _classifier.cleanLabel(labels[topIndex])
+          : 'Unknown';
+
       setState(() {
-        _detectedClass = cleanLabel;
-        _confidence = result.topConfidence * 100;
-        _scores = result.scores;
+        _detectedClass = displayLabel;
+        _confidence = topScore * 100;
+        _scores = smoothed;
       });
     }
 
@@ -119,9 +146,6 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
     setState(() => _isCapturing = true);
 
     try {
-      // Stop image stream before taking picture
-      await _cameraController!.stopImageStream();
-
       // Take picture
       final xFile = await _cameraController!.takePicture();
       final file = File(xFile.path);
@@ -135,13 +159,18 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to classify image')),
         );
-        // Restart stream
-        await _cameraController!.startImageStream(_processCameraFrame);
         setState(() => _isCapturing = false);
         return;
       }
 
       final cleanLabel = _classifier.cleanLabel(result.topLabel);
+
+      // Update overlay with this result (shown when user comes back)
+      setState(() {
+        _detectedClass = cleanLabel;
+        _confidence = result.topConfidence * 100;
+        _scores = result.scores;
+      });
 
       // Save detection record
       final groundTruthClass = widget.selectedClassName ?? 'Unknown';
@@ -161,7 +190,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       await DetectionStorageService.instance.saveRecord(record);
 
       // Navigate to result page
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => DetectionResultPage(
             detectedClassName: cleanLabel,
@@ -169,22 +198,16 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
             scores: result.scores,
           ),
         ),
-      ).then((_) {
-        // Restart stream when returning
-        if (mounted && _cameraController != null) {
-          _cameraController!.startImageStream(_processCameraFrame);
-          setState(() => _isCapturing = false);
-        }
-      });
+      );
+
+      if (mounted) {
+        setState(() => _isCapturing = false);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
-      // Try to restart stream
-      try {
-        await _cameraController!.startImageStream(_processCameraFrame);
-      } catch (_) {}
       setState(() => _isCapturing = false);
     }
   }

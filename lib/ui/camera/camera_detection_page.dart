@@ -183,6 +183,16 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         return;
       }
 
+      final labels = _classifier.labels;
+      for (int i = 0; i < result.scores.length; i++) {
+        final label = i < labels.length
+            ? _classifier.cleanLabel(labels[i])
+            : 'Class $i';
+        debugPrint(
+          '$i: $label -> ${result.scores[i].toStringAsFixed(3)}',
+        );
+      }
+
       if (result.topConfidence < AppConfig.minConfidenceToAccept) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -199,6 +209,25 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         });
         return;
       }
+
+      final cleanLabel = _classifier.cleanLabel(result.topLabel);
+
+      // Save detection record
+      final groundTruthClass = widget.selectedClassName ?? 'Unknown';
+      final groundTruthIndex = widget.selectedClassIndex ?? -1;
+
+      final record = DetectionRecord(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        timestamp: DateTime.now(),
+        groundTruthClass: groundTruthClass,
+        groundTruthIndex: groundTruthIndex,
+        predictedClass: cleanLabel,
+        predictedIndex: result.topIndex,
+        confidence: result.topConfidence,
+        scores: result.scores,
+      );
+
+      await DetectionStorageService.instance.saveRecord(record);
 
       final selectedIndex = widget.selectedClassIndex ?? -1;
       if (result.topIndex != selectedIndex) {
@@ -218,31 +247,12 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         return;
       }
 
-      final cleanLabel = _classifier.cleanLabel(result.topLabel);
-
       // Update overlay with this result (shown when user comes back)
       setState(() {
         _detectedClass = cleanLabel;
         _confidence = result.topConfidence * 100;
         _scores = result.scores;
       });
-
-      // Save detection record
-      final groundTruthClass = widget.selectedClassName ?? 'Unknown';
-      final groundTruthIndex = widget.selectedClassIndex ?? -1;
-
-      final record = DetectionRecord(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        timestamp: DateTime.now(),
-        groundTruthClass: groundTruthClass,
-        groundTruthIndex: groundTruthIndex,
-        predictedClass: cleanLabel,
-        predictedIndex: result.topIndex,
-        confidence: result.topConfidence,
-        scores: result.scores,
-      );
-
-      await DetectionStorageService.instance.saveRecord(record);
 
       // Navigate to result page
       await Navigator.of(context).push(
@@ -294,13 +304,18 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
           // Detection frame overlay
           Positioned.fill(
-            child: Container(
-              margin: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: _getConfidenceColor().withOpacity(0.9),
-                  width: 3,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: 3 / 4,
+                child: Container(
+                  margin: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: _getConfidenceColor().withOpacity(0.9),
+                      width: 3,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -358,7 +373,12 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       );
     }
 
-    return CameraPreview(_cameraController!);
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 3 / 4,
+        child: CameraPreview(_cameraController!),
+      ),
+    );
   }
 
   Widget _buildTopBar(String displayName) {

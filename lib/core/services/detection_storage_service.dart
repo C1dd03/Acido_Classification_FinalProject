@@ -71,11 +71,13 @@ class DetectionStorageService {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Total number of detections.
-  int get totalDetections => _cachedRecords.length;
+  int get totalDetections =>
+      _cachedRecords.where((r) => r.groundTruthIndex >= 0).length;
 
   /// Number of correct predictions.
-  int get correctPredictions =>
-      _cachedRecords.where((r) => r.isCorrect).length;
+  int get correctPredictions => _cachedRecords
+      .where((r) => r.groundTruthIndex >= 0 && r.isCorrect)
+      .length;
 
   /// Overall accuracy (0.0 - 1.0).
   double get accuracy =>
@@ -100,9 +102,10 @@ class DetectionStorageService {
     );
 
     for (final record in _cachedRecords) {
-      if (record.groundTruthIndex < numClasses &&
-          record.predictedIndex < numClasses) {
-        matrix[record.groundTruthIndex][record.predictedIndex]++;
+      final gi = record.groundTruthIndex;
+      final pi = record.predictedIndex;
+      if (gi >= 0 && gi < numClasses && pi >= 0 && pi < numClasses) {
+        matrix[gi][pi]++;
       }
     }
 
@@ -113,6 +116,7 @@ class DetectionStorageService {
   Map<int, int> get detectionsPerClass {
     final counts = <int, int>{};
     for (final record in _cachedRecords) {
+      if (record.groundTruthIndex < 0) continue;
       counts[record.groundTruthIndex] =
           (counts[record.groundTruthIndex] ?? 0) + 1;
     }

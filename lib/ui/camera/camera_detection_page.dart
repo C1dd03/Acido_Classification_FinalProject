@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme.dart';
+import '../../core/config/app_config.dart';
 import '../../core/models/detection_record.dart';
 import '../../core/services/detection_storage_service.dart';
 import '../../core/services/jersey_classifier_service.dart';
@@ -123,16 +124,24 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         }
       }
 
-      final labels = _classifier.labels;
-      final displayLabel = topIndex < labels.length
-          ? _classifier.cleanLabel(labels[topIndex])
-          : 'Unknown';
+      if (topScore < AppConfig.minConfidenceToAccept) {
+        setState(() {
+          _detectedClass = 'Ready to scan';
+          _confidence = 0;
+          _scores = [];
+        });
+      } else {
+        final labels = _classifier.labels;
+        final displayLabel = topIndex < labels.length
+            ? _classifier.cleanLabel(labels[topIndex])
+            : 'Unknown';
 
-      setState(() {
-        _detectedClass = displayLabel;
-        _confidence = topScore * 100;
-        _scores = smoothed;
-      });
+        setState(() {
+          _detectedClass = displayLabel;
+          _confidence = topScore * 100;
+          _scores = smoothed;
+        });
+      }
     }
 
     _isProcessingFrame = false;
@@ -140,6 +149,17 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
   Future<void> _captureAndNavigate() async {
     if (_isCapturing || _cameraController == null || !_isCameraInitialized) {
+      return;
+    }
+
+    if (widget.selectedClassIndex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select a class from the Home tab before capturing.',
+          ),
+        ),
+      );
       return;
     }
 
@@ -160,6 +180,41 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
           const SnackBar(content: Text('Failed to classify image')),
         );
         setState(() => _isCapturing = false);
+        return;
+      }
+
+      if (result.topConfidence < AppConfig.minConfidenceToAccept) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No known jersey detected. Please ensure the jersey fills the frame and try again.',
+            ),
+          ),
+        );
+        setState(() {
+          _isCapturing = false;
+          _detectedClass = 'No jersey detected';
+          _confidence = 0;
+          _scores = [];
+        });
+        return;
+      }
+
+      final selectedIndex = widget.selectedClassIndex ?? -1;
+      if (result.topIndex != selectedIndex) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Detected jersey does not match the selected class. Please retake with the correct jersey.',
+            ),
+          ),
+        );
+        setState(() {
+          _isCapturing = false;
+          _detectedClass = 'No jersey detected';
+          _confidence = 0;
+          _scores = [];
+        });
         return;
       }
 
@@ -394,25 +449,28 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
             ],
           ),
           const SizedBox(height: 12),
-          // Confidence bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: _confidence / 100,
-              backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(_getConfidenceColor()),
-              minHeight: 8,
+          if (_scores.isNotEmpty && _confidence > 0) ...[
+            // Confidence bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: _confidence / 100,
+                backgroundColor: Colors.white24,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(_getConfidenceColor()),
+                minHeight: 8,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${_confidence.toStringAsFixed(1)}% Confidence',
-            style: TextStyle(
-              color: _getConfidenceColor(),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 8),
+            Text(
+              '${_confidence.toStringAsFixed(1)}% Confidence',
+              style: TextStyle(
+                color: _getConfidenceColor(),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

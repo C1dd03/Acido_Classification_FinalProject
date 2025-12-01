@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app_theme.dart';
+import '../analytics/confusion_matrix_page.dart';
 
 class DetectionResultPage extends StatelessWidget {
   const DetectionResultPage({
@@ -181,7 +182,11 @@ class DetectionResultPage extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  // TODO: Navigate to confusion matrix screen for this detection.
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ConfusionMatrixPage(),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.grid_on_rounded),
                 label: const Text('View Confusion Matrix'),

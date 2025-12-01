@@ -12,7 +12,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  RecordFilter _selectedFilter = RecordFilter.verified;
+  RecordFilter _selectedFilter = RecordFilter.all;
 
   @override
   Widget build(BuildContext context) {

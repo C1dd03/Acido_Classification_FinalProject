@@ -12,7 +12,7 @@ class ConfusionMatrixPage extends StatefulWidget {
 }
 
 class _ConfusionMatrixPageState extends State<ConfusionMatrixPage> {
-  RecordFilter _selectedFilter = RecordFilter.verified;
+  RecordFilter _selectedFilter = RecordFilter.all;
 
   @override
   Widget build(BuildContext context) {

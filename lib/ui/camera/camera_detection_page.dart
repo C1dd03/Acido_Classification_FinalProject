@@ -410,6 +410,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         'Class ${(widget.selectedClassIndex ?? 0) + 1}';
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Camera Preview
@@ -555,7 +556,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

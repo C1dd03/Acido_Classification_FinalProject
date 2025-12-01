@@ -11,6 +11,7 @@ class DetectionRecord {
     required this.predictedIndex,
     required this.confidence,
     required this.scores,
+    this.isVerified = false,
   });
 
   /// Unique identifier for this record.
@@ -33,8 +34,26 @@ class DetectionRecord {
   /// All class scores from the model.
   final List<double> scores;
 
+  /// Whether the user has verified/confirmed this detection.
+  final bool isVerified;
+
   /// Whether the prediction was correct.
   bool get isCorrect => groundTruthIndex == predictedIndex;
+
+  /// Create a copy with updated fields.
+  DetectionRecord copyWith({bool? isVerified}) {
+    return DetectionRecord(
+      id: id,
+      timestamp: timestamp,
+      groundTruthClass: groundTruthClass,
+      groundTruthIndex: groundTruthIndex,
+      predictedClass: predictedClass,
+      predictedIndex: predictedIndex,
+      confidence: confidence,
+      scores: scores,
+      isVerified: isVerified ?? this.isVerified,
+    );
+  }
 
   /// Create from JSON map.
   factory DetectionRecord.fromJson(Map<String, dynamic> json) {
@@ -49,6 +68,7 @@ class DetectionRecord {
       scores: (json['scores'] as List<dynamic>)
           .map((e) => (e as num).toDouble())
           .toList(),
+      isVerified: json['isVerified'] as bool? ?? false,
     );
   }
 
@@ -63,6 +83,7 @@ class DetectionRecord {
       'predictedIndex': predictedIndex,
       'confidence': confidence,
       'scores': scores,
+      'isVerified': isVerified,
     };
   }
 

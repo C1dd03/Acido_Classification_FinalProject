@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
 
 import '../../app_theme.dart';
+import '../../core/models/record_filter.dart';
 import '../../core/services/detection_storage_service.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  RecordFilter _selectedFilter = RecordFilter.verified;
 
   @override
   Widget build(BuildContext context) {
     final storage = DetectionStorageService.instance;
-    final totalDetections = storage.totalDetections;
-    final accuracyPercent = (storage.accuracy * 100).toStringAsFixed(1);
+    final totalDetections = storage.getTotalDetections(_selectedFilter);
+    final accuracyPercent = (storage.getAccuracy(_selectedFilter) * 100).toStringAsFixed(1);
 
-    final perClassCounts = storage.detectionsPerClass;
+    final perClassCounts = storage.getDetectionsPerClass(_selectedFilter);
     final classNames = AppColors.classNames;
 
     return Scaffold(
@@ -31,12 +39,51 @@ class DashboardPage extends StatelessWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Overview of your detection history',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
+              const SizedBox(height: 12),
+              // Filter dropdown
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.textSecondary.withOpacity(0.2),
+                  ),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<RecordFilter>(
+                    value: _selectedFilter,
+                    isDense: true,
+                    icon: const Icon(Icons.filter_list, size: 20),
+                    items: RecordFilter.values.map((filter) {
+                      return DropdownMenuItem(
+                        value: filter,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getFilterIcon(filter),
+                              size: 16,
+                              color: _getFilterColor(filter),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              filter.label,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (filter) {
+                      if (filter != null) {
+                        setState(() => _selectedFilter = filter);
+                      }
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -87,7 +134,7 @@ class DashboardPage extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final name = classNames[index];
                       final count = perClassCounts[index] ?? 0;
-                      final acc = storage.accuracyForClass(index) * 100;
+                      final acc = storage.getAccuracyForClass(index, _selectedFilter) * 100;
                       final accText =
                           count == 0 ? '--' : '${acc.toStringAsFixed(1)}%';
 
@@ -158,6 +205,28 @@ class DashboardPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _getFilterIcon(RecordFilter filter) {
+    switch (filter) {
+      case RecordFilter.all:
+        return Icons.list;
+      case RecordFilter.verified:
+        return Icons.check_circle;
+      case RecordFilter.notVerified:
+        return Icons.pending;
+    }
+  }
+
+  Color _getFilterColor(RecordFilter filter) {
+    switch (filter) {
+      case RecordFilter.all:
+        return AppColors.primaryBlue;
+      case RecordFilter.verified:
+        return Colors.green;
+      case RecordFilter.notVerified:
+        return Colors.orange;
+    }
   }
 }
 

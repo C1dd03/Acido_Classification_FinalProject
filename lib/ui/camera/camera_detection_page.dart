@@ -261,6 +261,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
             detectedClassName: cleanLabel,
             confidence: result.topConfidence * 100,
             scores: result.scores,
+            recordId: record.id,
           ),
         ),
       );

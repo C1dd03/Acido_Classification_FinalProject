@@ -1,23 +1,73 @@
 import 'package:flutter/material.dart';
 
 import '../../app_theme.dart';
+import '../../core/services/detection_storage_service.dart';
 import '../analytics/confusion_matrix_page.dart';
 
-class DetectionResultPage extends StatelessWidget {
+class DetectionResultPage extends StatefulWidget {
   const DetectionResultPage({
     super.key,
     this.detectedClassName = 'Boston Celtics',
     this.confidence = 0.0,
     this.scores,
+    this.recordId,
   });
 
   final String detectedClassName;
   final double confidence;
   final List<double>? scores;
+  final String? recordId;
+
+  @override
+  State<DetectionResultPage> createState() => _DetectionResultPageState();
+}
+
+class _DetectionResultPageState extends State<DetectionResultPage> {
+  bool _isVerified = false;
+  bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfVerified();
+  }
+
+  void _checkIfVerified() {
+    if (widget.recordId != null) {
+      final record = DetectionStorageService.instance.getRecordById(widget.recordId!);
+      if (record != null && record.isVerified) {
+        setState(() => _isVerified = true);
+      }
+    }
+  }
+
+  Future<void> _verifyDetection() async {
+    if (widget.recordId == null || _isVerified || _isVerifying) return;
+
+    setState(() => _isVerifying = true);
+
+    final success = await DetectionStorageService.instance.verifyRecord(widget.recordId!);
+
+    if (mounted) {
+      setState(() {
+        _isVerifying = false;
+        _isVerified = success;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Detection confirmed!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final confidenceText = confidence.toStringAsFixed(1);
+    final confidenceText = widget.confidence.toStringAsFixed(1);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -46,16 +96,51 @@ class DetectionResultPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Detected Class',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Detected Class',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (_isVerified)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 14,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Verified',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    detectedClassName,
+                    widget.detectedClassName,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -97,8 +182,8 @@ class DetectionResultPage extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final color = AppColors.classColors[index];
                   final className = AppColors.classNames[index];
-                  final score = (scores != null && index < scores!.length)
-                      ? scores![index]
+                  final score = (widget.scores != null && index < widget.scores!.length)
+                      ? widget.scores![index]
                       : 0.0;
                   final scorePercent = (score * 100).toStringAsFixed(1);
 
@@ -160,10 +245,19 @@ class DetectionResultPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Save result.
-                    },
-                    child: const Text('Save result'),
+                    onPressed: _isVerified || _isVerifying || widget.recordId == null
+                        ? null
+                        : _verifyDetection,
+                    child: _isVerifying
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(_isVerified ? 'Confirmed' : 'Confirm result'),
                   ),
                 ),
                 const SizedBox(width: 8),

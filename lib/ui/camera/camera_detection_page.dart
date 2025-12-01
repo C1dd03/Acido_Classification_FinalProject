@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../app_theme.dart';
 import '../../core/config/app_config.dart';
@@ -45,6 +46,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
   bool _isCapturing = false;
 
   final _classifier = JerseyClassifierService.instance;
+  final _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -248,6 +250,118 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       }
 
       // Update overlay with this result (shown when user comes back)
+      setState(() {
+        _detectedClass = cleanLabel;
+        _confidence = result.topConfidence * 100;
+        _scores = result.scores;
+      });
+
+      // Navigate to result page
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetectionResultPage(
+            detectedClassName: cleanLabel,
+            confidence: result.topConfidence * 100,
+            scores: result.scores,
+            recordId: record.id,
+          ),
+        ),
+      );
+
+      if (mounted) {
+        setState(() => _isCapturing = false);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+      setState(() => _isCapturing = false);
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    if (_isCapturing) return;
+
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() => _isCapturing = true);
+
+      final imageFile = File(pickedFile.path);
+      final result = await _classifier.classifyImage(imageFile);
+
+      if (!mounted) return;
+
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to classify image')),
+        );
+        setState(() => _isCapturing = false);
+        return;
+      }
+
+      if (result.topConfidence < AppConfig.minConfidenceToAccept) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No known jersey detected in the image. Please try another image.',
+            ),
+          ),
+        );
+        setState(() {
+          _isCapturing = false;
+          _detectedClass = 'No jersey detected';
+          _confidence = 0;
+          _scores = [];
+        });
+        return;
+      }
+
+      final cleanLabel = _classifier.cleanLabel(result.topLabel);
+
+      // Save detection record
+      final groundTruthClass = widget.selectedClassName ?? 'Unknown';
+      final groundTruthIndex = widget.selectedClassIndex ?? -1;
+
+      final record = DetectionRecord(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        timestamp: DateTime.now(),
+        groundTruthClass: groundTruthClass,
+        groundTruthIndex: groundTruthIndex,
+        predictedClass: cleanLabel,
+        predictedIndex: result.topIndex,
+        confidence: result.topConfidence,
+        scores: result.scores,
+      );
+
+      await DetectionStorageService.instance.saveRecord(record);
+
+      final selectedIndex = widget.selectedClassIndex ?? -1;
+      if (result.topIndex != selectedIndex) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Detected jersey does not match the selected class. Please try another image.',
+            ),
+          ),
+        );
+        setState(() {
+          _isCapturing = false;
+          _detectedClass = 'No jersey detected';
+          _confidence = 0;
+          _scores = [];
+        });
+        return;
+      }
+
+      // Update overlay with this result
       setState(() {
         _detectedClass = cleanLabel;
         _confidence = result.topConfidence * 100;
@@ -504,45 +618,76 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Tap to capture & view details',
+            'Capture photo or upload from gallery',
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: _captureAndNavigate,
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    _getConfidenceColor(),
-                    _getConfidenceColor().withOpacity(0.7),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _getConfidenceColor().withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: _isCapturing
-                  ? const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        strokeWidth: 3,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 32,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Gallery button
+              GestureDetector(
+                onTap: _pickFromGallery,
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.2),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.5),
+                      width: 2,
                     ),
-            ),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              // Camera capture button
+              GestureDetector(
+                onTap: _captureAndNavigate,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        _getConfidenceColor(),
+                        _getConfidenceColor().withOpacity(0.7),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _getConfidenceColor().withOpacity(0.4),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: _isCapturing
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              // Placeholder for symmetry (or could add flash toggle)
+              const SizedBox(width: 56, height: 56),
+            ],
           ),
           const SizedBox(height: 16),
         ],

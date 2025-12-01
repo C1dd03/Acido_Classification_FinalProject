@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
 import 'home/class_selection_page.dart';
-import 'camera/camera_detection_page.dart';
+import 'history/history_page.dart';
 import 'analytics/dashboard_page.dart';
 
 class MainShell extends StatefulWidget {
@@ -17,14 +17,14 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _pages = const [
     ClassSelectionPage(),
-    CameraDetectionPage(),
+    HistoryPage(),
     DashboardPage(),
   ];
 
   final List<String> _titles = const [
-    'Select a Class',
-    'Camera',
-    'Dashboard',
+    'Detect',
+    'History',
+    'Analytics',
   ];
 
   @override
@@ -48,16 +48,19 @@ class _MainShellState extends State<MainShell> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'Home',
+            icon: Icon(Icons.camera_alt_outlined),
+            selectedIcon: Icon(Icons.camera_alt),
+            label: 'Detect',
           ),
           NavigationDestination(
-            icon: Icon(Icons.camera_alt_rounded),
-            label: 'Camera',
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'History',
           ),
           NavigationDestination(
-            icon: Icon(Icons.analytics_rounded),
-            label: 'Dashboard',
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'Analytics',
           ),
         ],
       ),

@@ -16,7 +16,7 @@ class ClassSelectionPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Select a Class',
+            'Select a Jersey',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -25,7 +25,7 @@ class ClassSelectionPage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Choose what you want to detect',
+            'Choose a team to start detection',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,

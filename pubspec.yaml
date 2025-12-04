@@ -39,6 +39,7 @@ dependencies:
   image: ^4.2.0
   camera: ^0.11.0+2
   shared_preferences: ^2.2.2
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:

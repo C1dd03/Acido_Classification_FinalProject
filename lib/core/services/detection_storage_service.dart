@@ -167,4 +167,207 @@ class DetectionStorageService {
     final cutoff = DateTime.now().subtract(Duration(days: days));
     return _cachedRecords.where((r) => r.timestamp.isAfter(cutoff)).toList();
   }
+
+  /// Get daily statistics for the last N days (for line+bar chart).
+  /// Returns a list of DailyStats sorted by date (oldest first).
+  List<DailyStats> getDailyStats(int days, RecordFilter filter) {
+    final now = DateTime.now();
+    final Map<String, List<DetectionRecord>> byDay = {};
+
+    // Initialize all days in range with empty lists
+    for (int i = days - 1; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      byDay[key] = [];
+    }
+
+    // Group filtered records by day
+    for (final record in getFilteredRecords(filter)) {
+      final key = _dateKey(record.timestamp);
+      if (byDay.containsKey(key)) {
+        byDay[key]!.add(record);
+      }
+    }
+
+    // Convert to DailyStats list
+    final stats = <DailyStats>[];
+    for (int i = days - 1; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      final records = byDay[key]!;
+      final count = records.length;
+      final correct = records.where((r) => r.isCorrect).length;
+      final accuracy = count == 0 ? 0.0 : correct / count;
+      final avgConfidence = count == 0
+          ? 0.0
+          : records.map((r) => r.confidence).reduce((a, b) => a + b) / count;
+
+      stats.add(DailyStats(
+        date: DateTime(date.year, date.month, date.day),
+        detectionCount: count,
+        accuracy: accuracy,
+        avgConfidence: avgConfidence,
+      ));
+    }
+
+    return stats;
+  }
+
+  /// Generate a date key string for grouping (YYYY-MM-DD).
+  String _dateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Additional analytics for improvements
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Get verification rate (0.0 - 1.0) based on filter.
+  double getVerificationRate(RecordFilter filter) {
+    final filtered = getFilteredRecords(filter);
+    if (filtered.isEmpty) return 0.0;
+    final verified = filtered.where((r) => r.isVerified).length;
+    return verified / filtered.length;
+  }
+
+  /// Get number of incorrect predictions based on filter.
+  int getIncorrectPredictions(RecordFilter filter) =>
+      getFilteredRecords(filter).where((r) => !r.isCorrect).length;
+
+  /// Get error rate (0.0 - 1.0) based on filter.
+  double getErrorRate(RecordFilter filter) {
+    final total = getTotalDetections(filter);
+    return total == 0 ? 0.0 : getIncorrectPredictions(filter) / total;
+  }
+
+  /// Get daily error statistics for line+bar chart (errors-only view).
+  List<DailyStats> getDailyErrorStats(int days, RecordFilter filter) {
+    final now = DateTime.now();
+    final Map<String, List<DetectionRecord>> byDay = {};
+
+    for (int i = days - 1; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      byDay[key] = [];
+    }
+
+    for (final record in getFilteredRecords(filter)) {
+      final key = _dateKey(record.timestamp);
+      if (byDay.containsKey(key)) {
+        byDay[key]!.add(record);
+      }
+    }
+
+    final stats = <DailyStats>[];
+    for (int i = days - 1; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      final records = byDay[key]!;
+      final count = records.length;
+      final errors = records.where((r) => !r.isCorrect).length;
+      final errorRate = count == 0 ? 0.0 : errors / count;
+
+      stats.add(DailyStats(
+        date: DateTime(date.year, date.month, date.day),
+        detectionCount: errors, // Show error count in bars
+        accuracy: 1.0 - errorRate, // Inverse for consistency
+        avgConfidence: errorRate, // Repurpose for error rate display
+      ));
+    }
+
+    return stats;
+  }
+
+  /// Get per-class accuracy stats sorted by accuracy ascending (hardest first).
+  List<ClassAccuracyStats> getHardestClasses(RecordFilter filter, int numClasses) {
+    final stats = <ClassAccuracyStats>[];
+
+    for (int i = 0; i < numClasses; i++) {
+      final classRecords = getFilteredRecords(filter)
+          .where((r) => r.groundTruthIndex == i)
+          .toList();
+      final count = classRecords.length;
+      final correct = classRecords.where((r) => r.isCorrect).length;
+      final accuracy = count == 0 ? -1.0 : correct / count; // -1 means no data
+
+      stats.add(ClassAccuracyStats(
+        classIndex: i,
+        sampleCount: count,
+        accuracy: accuracy,
+        errorCount: count - correct,
+      ));
+    }
+
+    // Sort by accuracy ascending (hardest first), but put no-data at the end
+    stats.sort((a, b) {
+      if (a.accuracy < 0 && b.accuracy < 0) return 0;
+      if (a.accuracy < 0) return 1;
+      if (b.accuracy < 0) return -1;
+      return a.accuracy.compareTo(b.accuracy);
+    });
+
+    return stats;
+  }
+
+  /// Get records with advanced filtering for history page.
+  List<DetectionRecord> getAdvancedFilteredRecords({
+    RecordFilter verificationFilter = RecordFilter.all,
+    int? classIndex,
+    bool? isCorrect,
+  }) {
+    return _cachedRecords.where((r) {
+      if (r.groundTruthIndex < 0) return false;
+
+      // Verification filter
+      switch (verificationFilter) {
+        case RecordFilter.verified:
+          if (!r.isVerified) return false;
+        case RecordFilter.notVerified:
+          if (r.isVerified) return false;
+        case RecordFilter.all:
+          break;
+      }
+
+      // Class filter
+      if (classIndex != null && r.groundTruthIndex != classIndex) {
+        return false;
+      }
+
+      // Correct/incorrect filter
+      if (isCorrect != null && r.isCorrect != isCorrect) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+}
+
+/// Holds daily aggregated statistics.
+class DailyStats {
+  final DateTime date;
+  final int detectionCount;
+  final double accuracy;
+  final double avgConfidence;
+
+  DailyStats({
+    required this.date,
+    required this.detectionCount,
+    required this.accuracy,
+    required this.avgConfidence,
+  });
+}
+
+/// Holds per-class accuracy statistics.
+class ClassAccuracyStats {
+  final int classIndex;
+  final int sampleCount;
+  final double accuracy; // -1 means no data
+  final int errorCount;
+
+  ClassAccuracyStats({
+    required this.classIndex,
+    required this.sampleCount,
+    required this.accuracy,
+    required this.errorCount,
+  });
 }

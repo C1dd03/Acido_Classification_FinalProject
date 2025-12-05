@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
+import '../main.dart';
 import 'home/class_selection_page.dart';
 import 'history/history_page.dart';
 import 'analytics/dashboard_page.dart';
@@ -29,16 +30,25 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = MyApp.isDarkMode(context);
+    
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textPrimary,
+        backgroundColor: Theme.of(context).cardColor,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0.5,
         title: Text(
           _titles[_currentIndex],
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () => MyApp.toggleTheme(context),
+            tooltip: isDark ? 'Light Mode' : 'Dark Mode',
+          ),
+        ],
       ),
       body: _pages[_currentIndex],
       bottomNavigationBar: NavigationBar(

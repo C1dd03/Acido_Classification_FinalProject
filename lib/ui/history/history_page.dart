@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app_theme.dart';
 import '../../core/models/detection_record.dart';
@@ -16,6 +17,15 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   HistoryFilter _filter = const HistoryFilter();
+  final TextEditingController _searchController = TextEditingController();
+  Set<String> _selectedIds = {};
+  bool _isSelectionMode = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +34,9 @@ class _HistoryPageState extends State<HistoryPage> {
       verificationFilter: _filter.verificationFilter,
       classIndex: _filter.classIndex,
       isCorrect: _filter.isCorrect,
+      searchQuery: _filter.searchQuery,
+      startDate: _filter.startDate,
+      endDate: _filter.endDate,
     );
     final totalRecords = storage.records.length;
 
@@ -32,27 +45,135 @@ class _HistoryPageState extends State<HistoryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header row
           Row(
             children: [
-              const Text(
-                'Detection History',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              if (_isSelectionMode) ...[
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      _isSelectionMode = false;
+                      _selectedIds.clear();
+                    });
+                  },
                 ),
-              ),
+                Text(
+                  '${_selectedIds.length} selected',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ] else ...[
+                const Text(
+                  'Detection History',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
               const Spacer(),
-              // Filter button
-              _FilterButton(
-                filter: _filter,
-                onFilterChanged: (newFilter) {
-                  setState(() => _filter = newFilter);
-                },
-              ),
+              if (_isSelectionMode) ...[
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: _selectedIds.isEmpty ? null : _deleteSelected,
+                ),
+              ] else ...[
+                // Export button
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: _handleMenuAction,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'export_json',
+                      child: Row(
+                        children: [
+                          Icon(Icons.code, size: 20),
+                          SizedBox(width: 8),
+                          Text('Export as JSON'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'export_csv',
+                      child: Row(
+                        children: [
+                          Icon(Icons.table_chart, size: 20),
+                          SizedBox(width: 8),
+                          Text('Export as CSV'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'select',
+                      child: Row(
+                        children: [
+                          Icon(Icons.checklist, size: 20),
+                          SizedBox(width: 8),
+                          Text('Select items'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'clear_all',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Clear all', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                // Filter button
+                _FilterButton(
+                  filter: _filter,
+                  onFilterChanged: (newFilter) {
+                    setState(() => _filter = newFilter);
+                  },
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
+          // Search bar
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by team name...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _filter = _filter.copyWith(clearSearchQuery: true);
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Theme.of(context).cardColor,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _filter = _filter.copyWith(searchQuery: value);
+              });
+            },
+          ),
+          const SizedBox(height: 8),
           Text(
             _filter.hasActiveFilters
                 ? '${records.length} of $totalRecords records'
@@ -72,7 +193,7 @@ class _HistoryPageState extends State<HistoryPage> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           if (records.isEmpty)
             Expanded(
               child: Center(
@@ -120,13 +241,107 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
+  void _handleMenuAction(String action) {
+    final storage = DetectionStorageService.instance;
+    switch (action) {
+      case 'export_json':
+        final json = storage.exportToJson(filter: _filter.verificationFilter);
+        Clipboard.setData(ClipboardData(text: json));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('JSON copied to clipboard')),
+        );
+        break;
+      case 'export_csv':
+        final csv = storage.exportToCsv(filter: _filter.verificationFilter);
+        Clipboard.setData(ClipboardData(text: csv));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CSV copied to clipboard')),
+        );
+        break;
+      case 'select':
+        setState(() => _isSelectionMode = true);
+        break;
+      case 'clear_all':
+        _showClearAllDialog();
+        break;
+    }
+  }
+
+  void _showClearAllDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Records'),
+        content: const Text(
+          'Are you sure you want to delete all detection records? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await DetectionStorageService.instance.clearAllRecords();
+              if (mounted) setState(() {});
+            },
+            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteSelected() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Selected'),
+        content: Text(
+          'Are you sure you want to delete ${_selectedIds.length} record(s)?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await DetectionStorageService.instance.deleteRecords(_selectedIds.toList());
+              if (mounted) {
+                setState(() {
+                  _selectedIds.clear();
+                  _isSelectionMode = false;
+                });
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRecordCard(BuildContext context, DetectionRecord record) {
     final isCorrect = record.isCorrect;
     final colorIndex = record.predictedIndex % AppColors.classColors.length;
     final accentColor = AppColors.classColors[colorIndex];
+    final isSelected = _selectedIds.contains(record.id);
 
     return GestureDetector(
       onTap: () async {
+        if (_isSelectionMode) {
+          setState(() {
+            if (isSelected) {
+              _selectedIds.remove(record.id);
+            } else {
+              _selectedIds.add(record.id);
+            }
+          });
+          return;
+        }
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => DetectionResultPage(
@@ -140,11 +355,24 @@ class _HistoryPageState extends State<HistoryPage> {
         // Refresh the list when returning (in case verification status changed)
         if (mounted) setState(() {});
       },
+      onLongPress: () {
+        if (!_isSelectionMode) {
+          setState(() {
+            _isSelectionMode = true;
+            _selectedIds.add(record.id);
+          });
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: isSelected 
+              ? AppColors.primaryBlue.withOpacity(0.1) 
+              : AppColors.cardBackground,
           borderRadius: BorderRadius.circular(12),
+          border: isSelected 
+              ? Border.all(color: AppColors.primaryBlue, width: 2)
+              : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -155,20 +383,37 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
         child: Row(
           children: [
-            // Color indicator
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
+            // Selection checkbox or Color indicator
+            if (_isSelectionMode)
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isSelected 
+                      ? AppColors.primaryBlue 
+                      : accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isSelected ? Icons.check : Icons.sports_basketball,
+                  color: isSelected ? Colors.white : accentColor,
+                  size: 24,
+                ),
+              )
+            else
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.sports_basketball,
+                  color: accentColor,
+                  size: 24,
+                ),
               ),
-              child: Icon(
-                Icons.sports_basketball,
-                color: accentColor,
-                size: 24,
-              ),
-            ),
             const SizedBox(width: 12),
             // Details
             Expanded(
@@ -548,6 +793,55 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
               },
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Date range filter
+          const Text(
+            'Date Range',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _selectDate(isStart: true),
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(
+                    _tempFilter.startDate != null
+                        ? _formatDate(_tempFilter.startDate!)
+                        : 'Start Date',
+                    style: TextStyle(
+                      color: _tempFilter.startDate != null
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _selectDate(isStart: false),
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(
+                    _tempFilter.endDate != null
+                        ? _formatDate(_tempFilter.endDate!)
+                        : 'End Date',
+                    style: TextStyle(
+                      color: _tempFilter.endDate != null
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
 
           // Apply button
@@ -579,6 +873,31 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
         ],
       ),
     );
+  }
+
+  Future<void> _selectDate({required bool isStart}) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isStart 
+          ? (_tempFilter.startDate ?? now)
+          : (_tempFilter.endDate ?? now),
+      firstDate: DateTime(2020),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _tempFilter = _tempFilter.copyWith(startDate: picked);
+        } else {
+          _tempFilter = _tempFilter.copyWith(endDate: picked);
+        }
+      });
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.month}/${date.day}/${date.year}';
   }
 }
 
@@ -626,8 +945,30 @@ class _ActiveFilterChips extends StatelessWidget {
               onFilterChanged(filter.copyWith(clearClassIndex: true));
             },
           ),
+        if (filter.startDate != null || filter.endDate != null)
+          _buildChip(
+            label: _formatDateRange(filter.startDate, filter.endDate),
+            color: AppColors.primaryBlue,
+            onRemove: () {
+              onFilterChanged(filter.copyWith(
+                clearStartDate: true,
+                clearEndDate: true,
+              ));
+            },
+          ),
       ],
     );
+  }
+
+  String _formatDateRange(DateTime? start, DateTime? end) {
+    if (start != null && end != null) {
+      return '${start.month}/${start.day} - ${end.month}/${end.day}';
+    } else if (start != null) {
+      return 'From ${start.month}/${start.day}';
+    } else if (end != null) {
+      return 'Until ${end.month}/${end.day}';
+    }
+    return '';
   }
 
   Widget _buildChip({

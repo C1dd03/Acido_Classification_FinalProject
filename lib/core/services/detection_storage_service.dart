@@ -313,6 +313,9 @@ class DetectionStorageService {
     RecordFilter verificationFilter = RecordFilter.all,
     int? classIndex,
     bool? isCorrect,
+    String? searchQuery,
+    DateTime? startDate,
+    DateTime? endDate,
   }) {
     return _cachedRecords.where((r) {
       if (r.groundTruthIndex < 0) return false;
@@ -337,8 +340,76 @@ class DetectionStorageService {
         return false;
       }
 
+      // Search query filter
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final query = searchQuery.toLowerCase();
+        final matchesPredicted = r.predictedClass.toLowerCase().contains(query);
+        final matchesGroundTruth = r.groundTruthClass.toLowerCase().contains(query);
+        if (!matchesPredicted && !matchesGroundTruth) return false;
+      }
+
+      // Date range filter
+      if (startDate != null) {
+        final recordDate = DateTime(r.timestamp.year, r.timestamp.month, r.timestamp.day);
+        final start = DateTime(startDate.year, startDate.month, startDate.day);
+        if (recordDate.isBefore(start)) return false;
+      }
+      if (endDate != null) {
+        final recordDate = DateTime(r.timestamp.year, r.timestamp.month, r.timestamp.day);
+        final end = DateTime(endDate.year, endDate.month, endDate.day);
+        if (recordDate.isAfter(end)) return false;
+      }
+
       return true;
     }).toList();
+  }
+
+  /// Delete multiple records by IDs.
+  Future<void> deleteRecords(List<String> ids) async {
+    await loadRecords();
+    _cachedRecords.removeWhere((r) => ids.contains(r.id));
+    await _persistRecords();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Export functionality
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Export all records as JSON string.
+  String exportToJson({RecordFilter filter = RecordFilter.all}) {
+    final records = getFilteredRecords(filter);
+    final data = records.map((r) => r.toJson()).toList();
+    return const JsonEncoder.withIndent('  ').convert({
+      'exportDate': DateTime.now().toIso8601String(),
+      'totalRecords': records.length,
+      'records': data,
+    });
+  }
+
+  /// Export all records as CSV string.
+  String exportToCsv({RecordFilter filter = RecordFilter.all}) {
+    final records = getFilteredRecords(filter);
+    final buffer = StringBuffer();
+
+    // Header
+    buffer.writeln('ID,Timestamp,Ground Truth,Ground Truth Index,Predicted,Predicted Index,Confidence,Is Correct,Is Verified');
+
+    // Data rows
+    for (final r in records) {
+      buffer.writeln(
+        '${r.id},'
+        '${r.timestamp.toIso8601String()},'
+        '"${r.groundTruthClass}",'
+        '${r.groundTruthIndex},'
+        '"${r.predictedClass}",'
+        '${r.predictedIndex},'
+        '${r.confidence.toStringAsFixed(4)},'
+        '${r.isCorrect},'
+        '${r.isVerified}'
+      );
+    }
+
+    return buffer.toString();
   }
 }
 

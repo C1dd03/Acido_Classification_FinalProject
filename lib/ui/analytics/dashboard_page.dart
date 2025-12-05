@@ -26,12 +26,9 @@ class _DashboardPageState extends State<DashboardPage> {
     final perClassCounts = storage.getDetectionsPerClass(_selectedFilter);
     final classNames = AppColors.classNames;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -177,7 +174,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Expanded(
+              SizedBox(
+                height: 300,
                 child: Container(
                   decoration: BoxDecoration(
                     color: AppColors.cardBackground,
@@ -197,8 +195,6 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 

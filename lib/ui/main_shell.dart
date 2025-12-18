@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app_theme.dart';
 import '../main.dart';
 import 'home/class_selection_page.dart';
 import 'history/history_page.dart';
@@ -22,16 +21,12 @@ class _MainShellState extends State<MainShell> {
     DashboardPage(),
   ];
 
-  final List<String> _titles = const [
-    'Detect',
-    'History',
-    'Analytics',
-  ];
+  final List<String> _titles = const ['Detect', 'History', 'Analytics'];
 
   @override
   Widget build(BuildContext context) {
     final isDark = MyApp.isDarkMode(context);
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(

@@ -5,7 +5,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../app_theme.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/detection_record.dart';
 import '../../core/services/detection_storage_service.dart';
@@ -109,7 +108,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         _smoothedScores = List<double>.from(scores);
       } else {
         for (int i = 0; i < scores.length; i++) {
-          _smoothedScores![i] = _smoothingFactor * scores[i] +
+          _smoothedScores![i] =
+              _smoothingFactor * scores[i] +
               (1 - _smoothingFactor) * _smoothedScores![i];
         }
       }
@@ -190,9 +190,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
         final label = i < labels.length
             ? _classifier.cleanLabel(labels[i])
             : 'Class $i';
-        debugPrint(
-          '$i: $label -> ${result.scores[i].toStringAsFixed(3)}',
-        );
+        debugPrint('$i: $label -> ${result.scores[i].toStringAsFixed(3)}');
       }
 
       if (result.topConfidence < AppConfig.minConfidenceToAccept) {
@@ -273,9 +271,9 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
       setState(() => _isCapturing = false);
     }
   }
@@ -385,9 +383,9 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
       setState(() => _isCapturing = false);
     }
   }
@@ -406,7 +404,8 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.selectedClassName ?? 
+    final displayName =
+        widget.selectedClassName ??
         'Class ${(widget.selectedClassIndex ?? 0) + 1}';
 
     return Scaffold(
@@ -414,9 +413,7 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
       body: Stack(
         children: [
           // Camera Preview
-          Positioned.fill(
-            child: _buildCameraPreview(),
-          ),
+          Positioned.fill(child: _buildCameraPreview()),
 
           // Detection frame overlay
           Positioned.fill(
@@ -592,8 +589,9 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
               child: LinearProgressIndicator(
                 value: _confidence / 100,
                 backgroundColor: Colors.white24,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(_getConfidenceColor()),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  _getConfidenceColor(),
+                ),
                 minHeight: 8,
               ),
             ),
@@ -674,7 +672,9 @@ class _CameraDetectionPageState extends State<CameraDetectionPage> {
                       ? const Padding(
                           padding: EdgeInsets.all(20),
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                             strokeWidth: 3,
                           ),
                         )

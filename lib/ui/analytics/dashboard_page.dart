@@ -21,7 +21,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final storage = DetectionStorageService.instance;
     final totalDetections = storage.getTotalDetections(_selectedFilter);
-    final accuracyPercent = (storage.getAccuracy(_selectedFilter) * 100).toStringAsFixed(1);
+    final accuracyPercent = (storage.getAccuracy(_selectedFilter) * 100)
+        .toStringAsFixed(1);
 
     final perClassCounts = storage.getDetectionsPerClass(_selectedFilter);
     final classNames = AppColors.classNames;
@@ -29,172 +30,169 @@ class _DashboardPageState extends State<DashboardPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Dashboard',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Dashboard',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Filter dropdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.textSecondary.withOpacity(0.2),
               ),
-              const SizedBox(height: 12),
-              // Filter dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.textSecondary.withOpacity(0.2),
-                  ),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<RecordFilter>(
-                    value: _selectedFilter,
-                    isDense: true,
-                    icon: const Icon(Icons.filter_list, size: 20),
-                    items: RecordFilter.values.map((filter) {
-                      return DropdownMenuItem(
-                        value: filter,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _getFilterIcon(filter),
-                              size: 16,
-                              color: _getFilterColor(filter),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              filter.label,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<RecordFilter>(
+                value: _selectedFilter,
+                isDense: true,
+                icon: const Icon(Icons.filter_list, size: 20),
+                items: RecordFilter.values.map((filter) {
+                  return DropdownMenuItem(
+                    value: filter,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getFilterIcon(filter),
+                          size: 16,
+                          color: _getFilterColor(filter),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (filter) {
-                      if (filter != null) {
-                        setState(() => _selectedFilter = filter);
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Errors-only toggle
-              Row(
-                children: [
-                  Text(
-                    'Show errors only',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
+                        const SizedBox(width: 8),
+                        Text(
+                          filter.label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Switch(
-                    value: _showErrorsOnly,
-                    activeColor: Colors.red,
-                    onChanged: (value) {
-                      setState(() => _showErrorsOnly = value);
-                    },
-                  ),
-                ],
+                  );
+                }).toList(),
+                onChanged: (filter) {
+                  if (filter != null) {
+                    setState(() => _selectedFilter = filter);
+                  }
+                },
               ),
-              const SizedBox(height: 12),
-              // Stats row 1
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Total Detections',
-                      value: '$totalDetections',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _StatCard(
-                      title: _showErrorsOnly ? 'Total Errors' : 'Overall Accuracy',
-                      value: totalDetections == 0
-                          ? '--'
-                          : _showErrorsOnly
-                              ? '${storage.getIncorrectPredictions(_selectedFilter)}'
-                              : '$accuracyPercent%',
-                      valueColor: _showErrorsOnly ? Colors.red : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Stats row 2: Verification rate + Error rate
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Verification Rate',
-                      value: totalDetections == 0
-                          ? '--'
-                          : '${(storage.getVerificationRate(_selectedFilter) * 100).toStringAsFixed(1)}%',
-                      valueColor: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Error Rate',
-                      value: totalDetections == 0
-                          ? '--'
-                          : '${(storage.getErrorRate(_selectedFilter) * 100).toStringAsFixed(1)}%',
-                      valueColor: Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Line + Bar Chart: Detections/Errors (bars) + Accuracy/ErrorRate (line)
-              _DailyStatsChart(
-                stats: _showErrorsOnly
-                    ? storage.getDailyErrorStats(7, _selectedFilter)
-                    : storage.getDailyStats(7, _selectedFilter),
-                isErrorMode: _showErrorsOnly,
-              ),
-              const SizedBox(height: 16),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Errors-only toggle
+          Row(
+            children: [
               Text(
-                _showErrorsOnly ? 'Hardest Jerseys' : 'Per-Class Performance',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                'Show errors only',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
+              const SizedBox(width: 8),
+              Switch(
+                value: _showErrorsOnly,
+                activeThumbColor: Colors.red,
+                onChanged: (value) {
+                  setState(() => _showErrorsOnly = value);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Stats row 1
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  title: 'Total Detections',
+                  value: '$totalDetections',
                 ),
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 300,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: _showErrorsOnly
-                      ? _buildHardestJerseysList(storage)
-                      : _buildPerClassList(storage, perClassCounts, classNames),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  title: _showErrorsOnly ? 'Total Errors' : 'Overall Accuracy',
+                  value: totalDetections == 0
+                      ? '--'
+                      : _showErrorsOnly
+                      ? '${storage.getIncorrectPredictions(_selectedFilter)}'
+                      : '$accuracyPercent%',
+                  valueColor: _showErrorsOnly ? Colors.red : null,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          // Stats row 2: Verification rate + Error rate
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  title: 'Verification Rate',
+                  value: totalDetections == 0
+                      ? '--'
+                      : '${(storage.getVerificationRate(_selectedFilter) * 100).toStringAsFixed(1)}%',
+                  valueColor: Colors.green,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  title: 'Error Rate',
+                  value: totalDetections == 0
+                      ? '--'
+                      : '${(storage.getErrorRate(_selectedFilter) * 100).toStringAsFixed(1)}%',
+                  valueColor: Colors.orange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Line + Bar Chart: Detections/Errors (bars) + Accuracy/ErrorRate (line)
+          _DailyStatsChart(
+            stats: _showErrorsOnly
+                ? storage.getDailyErrorStats(7, _selectedFilter)
+                : storage.getDailyStats(7, _selectedFilter),
+            isErrorMode: _showErrorsOnly,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _showErrorsOnly ? 'Hardest Jerseys' : 'Per-Class Performance',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 300,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: _showErrorsOnly
+                  ? _buildHardestJerseysList(storage)
+                  : _buildPerClassList(storage, perClassCounts, classNames),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -242,7 +240,8 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 40,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
-                color: AppColors.classColors[index % AppColors.classColors.length],
+                color:
+                    AppColors.classColors[index % AppColors.classColors.length],
               ),
             ),
             const SizedBox(width: 12),
@@ -297,7 +296,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildHardestJerseysList(DetectionStorageService storage) {
-    final hardest = storage.getHardestClasses(_selectedFilter, AppColors.classNames.length);
+    final hardest = storage.getHardestClasses(
+      _selectedFilter,
+      AppColors.classNames.length,
+    );
     final classNames = AppColors.classNames;
 
     return ListView.separated(
@@ -343,7 +345,9 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 40,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
-                color: AppColors.classColors[stat.classIndex % AppColors.classColors.length],
+                color:
+                    AppColors.classColors[stat.classIndex %
+                        AppColors.classColors.length],
               ),
             ),
             const SizedBox(width: 12),
@@ -399,11 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    this.valueColor,
-  });
+  const _StatCard({required this.title, required this.value, this.valueColor});
 
   final String title;
   final String value;
@@ -451,10 +451,7 @@ class _StatCard extends StatelessWidget {
 
 /// Line + Bar combo chart showing daily detections (bars) and accuracy (line).
 class _DailyStatsChart extends StatelessWidget {
-  const _DailyStatsChart({
-    required this.stats,
-    this.isErrorMode = false,
-  });
+  const _DailyStatsChart({required this.stats, this.isErrorMode = false});
 
   final List<DailyStats> stats;
   final bool isErrorMode;
@@ -517,8 +514,8 @@ class _DailyStatsChart extends StatelessWidget {
                           getTooltipItem: (group, groupIndex, rod, rodIndex) {
                             final stat = stats[group.x.toInt()];
                             if (isErrorMode) {
-                              final errorRate =
-                                  (stat.avgConfidence * 100).toStringAsFixed(1);
+                              final errorRate = (stat.avgConfidence * 100)
+                                  .toStringAsFixed(1);
                               return BarTooltipItem(
                                 '${_formatDate(stat.date)}\n'
                                 'Errors: ${stat.detectionCount}\n'
@@ -529,8 +526,8 @@ class _DailyStatsChart extends StatelessWidget {
                                 ),
                               );
                             }
-                            final accPercent =
-                                (stat.accuracy * 100).toStringAsFixed(1);
+                            final accPercent = (stat.accuracy * 100)
+                                .toStringAsFixed(1);
                             return BarTooltipItem(
                               '${_formatDate(stat.date)}\n'
                               'Detections: ${stat.detectionCount}\n'
@@ -604,7 +601,9 @@ class _DailyStatsChart extends StatelessWidget {
                               return Text(
                                 '${percent.toInt()}%',
                                 style: TextStyle(
-                                  color: isErrorMode ? Colors.orange : Colors.green,
+                                  color: isErrorMode
+                                      ? Colors.orange
+                                      : Colors.green,
                                   fontSize: 10,
                                 ),
                               );
@@ -697,8 +696,18 @@ class _DailyStatsChart extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}';
   }
@@ -730,10 +739,7 @@ class _LegendItem extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
       ],
     );

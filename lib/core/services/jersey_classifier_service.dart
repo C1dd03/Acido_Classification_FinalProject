@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
@@ -110,17 +109,17 @@ class JerseyClassifierService {
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         final int yIndex = y * yRowStride + x * yPixelStride;
-        final int uvIndex =
-            (y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride;
+        final int uvIndex = (y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride;
 
         final double yValue = yBytes[yIndex].toDouble();
         final double uValue = uBytes[uvIndex].toDouble() - 128.0;
         final double vValue = vBytes[uvIndex].toDouble() - 128.0;
 
         int r = (yValue + 1.402 * vValue).round().clamp(0, 255);
-        int g = (yValue - 0.344136 * uValue - 0.714136 * vValue)
-            .round()
-            .clamp(0, 255);
+        int g = (yValue - 0.344136 * uValue - 0.714136 * vValue).round().clamp(
+          0,
+          255,
+        );
         int b = (yValue + 1.772 * uValue).round().clamp(0, 255);
 
         image.setPixelRgb(x, y, r, g, b);
@@ -163,17 +162,10 @@ class JerseyClassifierService {
       1,
       (_) => List.generate(
         _inputHeight,
-        (y) => List.generate(
-          _inputWidth,
-          (x) {
-            final pixel = resizedImage.getPixel(x, y);
-            return [
-              pixel.r / 255.0,
-              pixel.g / 255.0,
-              pixel.b / 255.0,
-            ];
-          },
-        ),
+        (y) => List.generate(_inputWidth, (x) {
+          final pixel = resizedImage.getPixel(x, y);
+          return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
+        }),
       ),
     );
 

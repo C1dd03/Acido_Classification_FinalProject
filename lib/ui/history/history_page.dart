@@ -18,7 +18,7 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   HistoryFilter _filter = const HistoryFilter();
   final TextEditingController _searchController = TextEditingController();
-  Set<String> _selectedIds = {};
+  final Set<String> _selectedIds = {};
   bool _isSelectionMode = false;
 
   @override
@@ -123,9 +123,16 @@ class _HistoryPageState extends State<HistoryPage> {
                       value: 'clear_all',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                          Icon(
+                            Icons.delete_forever,
+                            size: 20,
+                            color: Colors.red,
+                          ),
                           SizedBox(width: 8),
-                          Text('Clear all', style: TextStyle(color: Colors.red)),
+                          Text(
+                            'Clear all',
+                            style: TextStyle(color: Colors.red),
+                          ),
                         ],
                       ),
                     ),
@@ -161,7 +168,10 @@ class _HistoryPageState extends State<HistoryPage> {
                   : null,
               filled: true,
               fillColor: Theme.of(context).cardColor,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -184,7 +194,7 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           ),
           // Active filter chips
-          if (_filter.hasActiveFilters) ...[  
+          if (_filter.hasActiveFilters) ...[
             const SizedBox(height: 8),
             _ActiveFilterChips(
               filter: _filter,
@@ -286,7 +296,10 @@ class _HistoryPageState extends State<HistoryPage> {
               await DetectionStorageService.instance.clearAllRecords();
               if (mounted) setState(() {});
             },
-            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+            child: const Text(
+              'Delete All',
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -309,7 +322,9 @@ class _HistoryPageState extends State<HistoryPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await DetectionStorageService.instance.deleteRecords(_selectedIds.toList());
+              await DetectionStorageService.instance.deleteRecords(
+                _selectedIds.toList(),
+              );
               if (mounted) {
                 setState(() {
                   _selectedIds.clear();
@@ -366,11 +381,11 @@ class _HistoryPageState extends State<HistoryPage> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? AppColors.primaryBlue.withOpacity(0.1) 
+          color: isSelected
+              ? AppColors.primaryBlue.withOpacity(0.1)
               : AppColors.cardBackground,
           borderRadius: BorderRadius.circular(12),
-          border: isSelected 
+          border: isSelected
               ? Border.all(color: AppColors.primaryBlue, width: 2)
               : null,
           boxShadow: [
@@ -389,8 +404,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isSelected 
-                      ? AppColors.primaryBlue 
+                  color: isSelected
+                      ? AppColors.primaryBlue
                       : accentColor.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -538,10 +553,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
 /// Filter button that opens a bottom sheet with filter options.
 class _FilterButton extends StatelessWidget {
-  const _FilterButton({
-    required this.filter,
-    required this.onFilterChanged,
-  });
+  const _FilterButton({required this.filter, required this.onFilterChanged});
 
   final HistoryFilter filter;
   final ValueChanged<HistoryFilter> onFilterChanged;
@@ -589,10 +601,8 @@ class _FilterButton extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _FilterBottomSheet(
-        filter: filter,
-        onFilterChanged: onFilterChanged,
-      ),
+      builder: (context) =>
+          _FilterBottomSheet(filter: filter, onFilterChanged: onFilterChanged),
     );
   }
 }
@@ -680,7 +690,9 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                 },
                 selectedColor: AppColors.primaryBlue.withOpacity(0.2),
                 labelStyle: TextStyle(
-                  color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary,
+                  color: isSelected
+                      ? AppColors.primaryBlue
+                      : AppColors.textPrimary,
                 ),
               );
             }).toList(),
@@ -768,7 +780,9 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                     selected: isSelected,
                     onSelected: (selected) {
                       setState(() {
-                        _tempFilter = _tempFilter.copyWith(clearClassIndex: true);
+                        _tempFilter = _tempFilter.copyWith(
+                          clearClassIndex: true,
+                        );
                       });
                     },
                     selectedColor: AppColors.primaryBlue.withOpacity(0.2),
@@ -785,10 +799,14 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                   ),
                   onSelected: (selected) {
                     setState(() {
-                      _tempFilter = _tempFilter.copyWith(classIndex: classIndex);
+                      _tempFilter = _tempFilter.copyWith(
+                        classIndex: classIndex,
+                      );
                     });
                   },
-                  selectedColor: AppColors.classColors[classIndex].withOpacity(0.2),
+                  selectedColor: AppColors.classColors[classIndex].withOpacity(
+                    0.2,
+                  ),
                 );
               },
             ),
@@ -862,10 +880,7 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
               ),
               child: const Text(
                 'Apply Filters',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -879,7 +894,7 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart 
+      initialDate: isStart
           ? (_tempFilter.startDate ?? now)
           : (_tempFilter.endDate ?? now),
       firstDate: DateTime(2020),
@@ -950,10 +965,9 @@ class _ActiveFilterChips extends StatelessWidget {
             label: _formatDateRange(filter.startDate, filter.endDate),
             color: AppColors.primaryBlue,
             onRemove: () {
-              onFilterChanged(filter.copyWith(
-                clearStartDate: true,
-                clearEndDate: true,
-              ));
+              onFilterChanged(
+                filter.copyWith(clearStartDate: true, clearEndDate: true),
+              );
             },
           ),
       ],
@@ -996,11 +1010,7 @@ class _ActiveFilterChips extends StatelessWidget {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onRemove,
-            child: Icon(
-              Icons.close,
-              size: 14,
-              color: color,
-            ),
+            child: Icon(Icons.close, size: 14, color: color),
           ),
         ],
       ),
